@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+  labels:
+    app.kubernetes.io/component: awx
+    app.kubernetes.io/managed-by: awx-operator
+    app.kubernetes.io/operator-version: 2.19.1
+    app.kubernetes.io/part-of: awx-demo
+  name: awx-demo-service
+  namespace: awx
+  ownerReferences:
+  - apiVersion: awx.ansible.com/v1beta1
+    kind: AWX
+    name: awx-demo
+    uid: 8dfd8f4b-8ab7-40b4-b926-5d74224110ba
+  resourceVersion: "180858"
+  uid: 9894c7dd-6e8d-4811-8108-6a8d7cd7d41a
+spec:
+  clusterIP: 10.110.28.246
+  clusterIPs:
+  - 10.110.28.246
+  externalTrafficPolicy: Cluster
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - name: http
+    nodePort: 32274
+    port: 80
+    protocol: TCP
+    targetPort: 8052
+  selector:
+    app.kubernetes.io/component: awx
+    app.kubernetes.io/managed-by: awx-operator
+    app.kubernetes.io/name: awx-demo-web
+  sessionAffinity: None
+  type: LoadBalancer
+status:
+  loadBalancer: {}
