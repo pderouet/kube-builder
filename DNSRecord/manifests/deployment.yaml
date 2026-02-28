@@ -1,33 +1,3 @@
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: dns-operator-role
-  namespace: dns-mngr
-rules:
-  - apiGroups: ["example.com"]
-    resources: ["dnsrecords"]
-    verbs: ["get","list","watch","create","update","patch","delete"]
-  - apiGroups: ["example.com"]
-    resources: ["dnsrecords/status"]
-    verbs: ["get","update","patch"]
-  - apiGroups: [""]
-    resources: ["services","endpoints","secrets"]
-    verbs: ["get","list","watch"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: dns-operator-rb
-  namespace: dns-mngr
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: dns-operator-role
-subjects:
-  - kind: ServiceAccount
-    name: dns-operator-sa
-    namespace: dns-mngr
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
