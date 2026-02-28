@@ -6,7 +6,7 @@ set -euo pipefail
 # IMAGE=<registry>/<user>/dns-operator:tag ./build-and-deploy.sh
 # If IMAGE not set, defaults to docker.io/$(whoami)/dns-operator:local
 
-IMAGE_DEFAULT="docker.io/$(whoami)/dns-operator:local"
+IMAGE_DEFAULT="docker.io/kigarsk/dns-operator:0.1.0"
 IMAGE=${IMAGE:-$IMAGE_DEFAULT}
 
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
