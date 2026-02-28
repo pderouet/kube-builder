@@ -249,8 +249,8 @@ def _process_service_dns(ns, svc_name, annotations, logger):
         return
 
 
-@kopf.on.create('', 'v1', 'services', namespace=NAMESPACE)
-@kopf.on.update('', 'v1', 'services', namespace=NAMESPACE)
+@kopf.on.create('', 'v1', 'services')
+@kopf.on.update('', 'v1', 'services')
 def service_create_update(body, meta, spec, namespace, logger, **kwargs):
     try:
         annotations = _get_annotation_map(meta)
@@ -267,7 +267,7 @@ def service_create_update(body, meta, spec, namespace, logger, **kwargs):
         logger.exception("Service handler error")
 
 
-@kopf.on.delete('', 'v1', 'services', namespace=NAMESPACE)
+@kopf.on.delete('', 'v1', 'services')
 def service_delete(body, meta, spec, namespace, logger, **kwargs):
     annotations = _get_annotation_map(meta)
     logger.info("Service delete event: %s/%s annotations=%s", namespace, meta.get('name'), annotations)
