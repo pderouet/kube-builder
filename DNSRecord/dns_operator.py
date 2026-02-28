@@ -157,8 +157,12 @@ def dnsrecord_add(session, zone, name, rec_type, value, ttl=None):
         kw["a_rec"] = [value]
     elif rec_type == "CNAME":
         kw["cname_rec"] = value
-    if ttl:
-        kw["ttl"] = str(ttl)
+    if ttl is not None:
+        # FreeIPA expects TTL as option 'dnsttl' (integer)
+        try:
+            kw["dnsttl"] = int(ttl)
+        except Exception:
+            kw["dnsttl"] = int(str(ttl))
     return ipa_call(session, "dnsrecord_add", [[zone, name], kw])
 
 def dnsrecord_del(session, zone, name, rec_type=None, value=None):
