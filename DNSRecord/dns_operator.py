@@ -170,9 +170,19 @@ def dnsrecord_del(session, zone, name, rec_type=None, value=None):
     kw = {}
     if rec_type:
         if rec_type == "A":
-            kw["a_rec"] = [value] if value else []
+            if value:
+                kw["a_rec"] = [value]
+            else:
+                # delete all A records for this name
+                kw["a_rec"] = []
         elif rec_type == "CNAME":
-            kw["cname_rec"] = value
+            if value:
+                kw["cname_rec"] = value
+            else:
+                kw["cname_rec"] = ""
+    else:
+        # No rec_type/value provided: instruct FreeIPA to delete the whole record
+        kw["del_all"] = True
     return ipa_call(session, "dnsrecord_del", [[zone, name], kw])
 
 def ensure_session():
