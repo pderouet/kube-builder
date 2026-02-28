@@ -4,7 +4,7 @@ metadata:
   name: pgadmin-pvc
   namespace: pgadmin
 spec:
-  storageClassName: standard
+  storageClassName: nfs-default
   accessModes:
     - ReadWriteOnce
   resources:
