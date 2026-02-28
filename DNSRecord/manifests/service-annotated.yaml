@@ -4,8 +4,9 @@ metadata:
   name: example-loadbalancer
   namespace: ingress-nginx
   annotations:
-    dns.example.com/dns-name: "ingress.example.lan."
-    dns.example.com/zone: "example.lan."
+    # Set DNS to <namespace>-<service>.kube.axiome-it.lan
+    dns.example.com/dns-name: "dns-mngr-example-loadbalancer.kube.axiome-it.lan."
+    dns.example.com/zone: "kube.axiome-it.lan."
     dns.example.com/ttl: "300"
 spec:
   type: LoadBalancer
