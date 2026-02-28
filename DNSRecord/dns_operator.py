@@ -178,15 +178,6 @@ def _serve_health(port=8080):
     with socketserver.TCPServer(("0.0.0.0", port), _HealthHandler) as httpd:
         httpd.serve_forever()
 
-if __name__ == "__main__":
-    # start health server
-    t = threading.Thread(target=_serve_health, kwargs={"port": 8080}, daemon=True)
-    t.start()
-
-    # run kopf (will block)
-    # use programmatic run so handlers defined in this module are used
-    kopf.run()
-
 
 # --- Service watchers using annotations ---------------------------------
 
@@ -303,3 +294,11 @@ def service_delete(body, meta, spec, namespace, logger, **kwargs):
         else:
             raise kopf.TemporaryError(f"IPA delete failed: {e}", delay=20)
 
+if __name__ == "__main__":
+    # start health server
+    t = threading.Thread(target=_serve_health, kwargs={"port": 8080}, daemon=True)
+    t.start()
+
+    # run kopf (will block)
+    # use programmatic run so handlers defined in this module are used
+    kopf.run()
