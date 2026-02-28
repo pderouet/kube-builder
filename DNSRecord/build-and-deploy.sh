@@ -45,6 +45,14 @@ if ! docker push "$IMAGE"; then
   echo "Warning: docker push failed. If you are testing locally, you can load the image into your cluster instead." >&2
 fi
 
+color_sep "Apply manifests"
+echo -e "${GREEN}Ensuring namespace 'dns-mngr' exists and applying manifests...${RESET}"
+if ! kubectl get namespace dns-mngr >/dev/null 2>&1; then
+  kubectl create namespace dns-mngr || true
+fi
+# Apply all manifests via kustomize in the manifests directory
+kubectl apply -k ./manifests
+
 color_sep "Update deployment"
 echo -e "${GREEN}Updating deployment/dns-operator image to ${IMAGE}${RESET}"
 kubectl -n dns-mngr set image deployment/dns-operator dns-operator="$IMAGE" --record
@@ -54,16 +62,6 @@ kubectl -n dns-mngr delete pods -l app=dns-operator --wait=false || true
 echo -e "${YELLOW}Waiting 5s for pods to be re-created...${RESET}"
 sleep 5
 kubectl -n dns-mngr get pods -l app=dns-operator -o wide || true
-
-
-color_sep "Apply manifests"
-echo -e "${GREEN}Ensuring namespace 'dns-mngr' exists and applying manifests...${RESET}"
-if ! kubectl get namespace dns-mngr >/dev/null 2>&1; then
-  kubectl create namespace dns-mngr || true
-fi
-# Apply all manifests via kustomize in the manifests directory
-kubectl apply -k ./manifests
-
 
 color_sep "Deployed"
 echo -e "${GREEN}Deployed ${IMAGE}${RESET}"
