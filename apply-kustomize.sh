@@ -32,18 +32,38 @@ if [ -z "${KUST_DIR:-}" ] || [ ! -d "$KUST_DIR" ]; then
   exit 2
 fi
 
-# Detect default namespace from kustomization if present
+# Detect namespaces via kubectl (present choices + create option)
 KUST_FILE="$KUST_DIR/kustomization.yaml"
-DEFAULT_NS="default"
-if [ -f "$KUST_FILE" ]; then
-  ns_line=$(grep -E "^\s*namespace\s*:\s*" "$KUST_FILE" || true)
-  if [ -n "$ns_line" ]; then
-    DEFAULT_NS=$(echo "$ns_line" | awk -F: '{print $2}' | xargs)
-  fi
+if command -v kubectl >/dev/null 2>&1; then
+  mapfile -t NS_LIST < <(kubectl get ns -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || echo default)
+else
+  NS_LIST=(default)
 fi
 
-read -rp "Namespace cible [${DEFAULT_NS}]: " TARGET_NS
-TARGET_NS=${TARGET_NS:-$DEFAULT_NS}
+options_ns=("${NS_LIST[@]}" "Create new namespace" "Cancel")
+echo "Choisissez un namespace existant ou créez-en un :"
+PS3="Votre choix (num): "
+select ns_opt in "${options_ns[@]}"; do
+  if [ -z "${ns_opt:-}" ]; then
+    echo "Choix invalide."; continue
+  fi
+  if [ "$ns_opt" = "Create new namespace" ]; then
+    read -rp "Nom du namespace à créer: " NEW_NS
+    if [ -z "$NEW_NS" ]; then echo "Nom vide."; continue; fi
+    if command -v kubectl >/dev/null 2>&1; then
+      kubectl create namespace "$NEW_NS" || { echo "Échec création du namespace" >&2; exit 1; }
+      TARGET_NS="$NEW_NS"
+      break
+    else
+      echo "kubectl introuvable, impossible de créer le namespace."; continue
+    fi
+  elif [ "$ns_opt" = "Cancel" ]; then
+    echo "Annulé."; exit 0
+  else
+    TARGET_NS="$ns_opt"
+    break
+  fi
+done
 
 read -rp "Confirmer application de $KUST_DIR sur namespace '$TARGET_NS' ? (y/N) " confirm
 if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
