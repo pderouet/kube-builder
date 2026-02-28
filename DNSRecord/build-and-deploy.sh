@@ -56,6 +56,15 @@ sleep 5
 kubectl -n dns-mngr get pods -l app=dns-operator -o wide || true
 
 
+color_sep "Apply manifests"
+echo -e "${GREEN}Ensuring namespace 'dns-mngr' exists and applying manifests...${RESET}"
+if ! kubectl get namespace dns-mngr >/dev/null 2>&1; then
+  kubectl create namespace dns-mngr || true
+fi
+# Apply all manifests via kustomize in the manifests directory
+kubectl apply -k ./manifests
+
+
 color_sep "Deployed"
 echo -e "${GREEN}Deployed ${IMAGE}${RESET}"
 
