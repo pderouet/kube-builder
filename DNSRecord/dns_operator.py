@@ -19,8 +19,12 @@ IPA_JSONRPC = f"{IPA_SERVER}/ipa/session/json"
 LOGIN_PATH = f"{IPA_SERVER}/ipa/session/login_password"
 CREDENTIALS_SECRET = os.environ.get("IPA_CRED_SECRET", "freeipa-credentials")
 NAMESPACE = os.environ.get("OP_NS", "default")
-FINALIZER = "dnsrecord.finalizers.example.com"
 REQUEST_TIMEOUT = int(os.environ.get("REQ_TIMEOUT", "10"))
+# Annotations used to trigger Service-based DNS management
+ANNOTATION_PREFIX = os.environ.get("DNS_ANNOTATION_PREFIX", "dns.example.com")
+ANNOTATION_DNS_NAME = ANNOTATION_PREFIX + "/dns-name"
+ANNOTATION_ZONE = ANNOTATION_PREFIX + "/zone"
+ANNOTATION_TTL = ANNOTATION_PREFIX + "/ttl"
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -149,139 +153,7 @@ def configure(settings: kopf.OperatorSettings, **_):
     settings.posting.level = logging.INFO
     settings.scanning.disabled = False
     settings.watching.server_timeout = 60
-
-@kopf.on.create('example.com', 'v1', 'dnsrecords')
-@kopf.on.update('example.com', 'v1', 'dnsrecords')
-def reconcile(spec, meta, status, namespace, logger, **kwargs):
-    # Main reconcile logic for create/update
-    name = spec.get("name")
-    zone = spec.get("zone")
-    rec_type = spec.get("type", "A")
-    ttl = spec.get("ttl")
-    svc_ns = spec.get("serviceNamespace", namespace)
-    svc_name = spec.get("serviceName")
-
-    # Add finalizer if not present
-    if FINALIZER not in meta.get("finalizers", []):
-        kubernetes.client.CustomObjectsApi().patch_namespaced_custom_object(
-            group="example.com", version="v1", namespace=namespace, plural="dnsrecords",
-            name=meta["name"],
-            body={"metadata": {"finalizers": (meta.get("finalizers") or []) + [FINALIZER]}}
-        )
-        raise kopf.PermanentError("Finalizer added; requeueing")
-
-    # Only A records supported for MetalLB-derived IPs
-    if rec_type != "A":
-        raise kopf.PermanentError("This operator supports only type: A when using service IP from MetalLB.")
-
-    # Resolve IP from Service
-    ip = fetch_service_ip(svc_ns, svc_name)
-    if not ip:
-        # Will requeue with backoff
-        raise kopf.TemporaryError(f"Service {svc_ns}/{svc_name} has no external IP yet", delay=15)
-
-    # Normalize name relative to zone for FreeIPA JSON-RPC (record_name)
-    record_name = normalize_name(name, zone)
-
-    # Authenticate to IPA
-    try:
-        session = ensure_session()
-    except Exception as e:
-        raise kopf.TemporaryError(f"IPA auth failed: {e}", delay=30)
-
-    # Check existing record
-    try:
-        res = dnsrecord_show(session, zone, record_name)
-        exists = True
-    except Exception as e:
-        # inspect message to detect not found vs other errors
-        msg = str(e)
-        if "not found" in msg.lower() or "no such" in msg.lower():
-            exists = False
-            res = None
-        else:
-            raise kopf.TemporaryError(f"IPA show failed: {e}", delay=20)
-
-    # Compare and act
-    if exists:
-        # try to discover A records in result
-        # result structure may vary; attempt to read 'result' keys
-        recs = []
-        try:
-            recs = res.get("result", {}).get("a_rec", []) or []
-        except Exception:
-            recs = []
-        if ip in recs:
-            # nothing to do
-            patch_status(namespace, meta["name"], {"phase": "Created", "message": f"A record present {ip}", "observedGeneration": meta.get("generation", 0)})
-            return
-        else:
-            # Update: delete then add (atomicity caveat)
-            try:
-                dnsrecord_del(session, zone, record_name)
-            except Exception as e:
-                raise kopf.TemporaryError(f"IPA delete during update failed: {e}", delay=20)
-            try:
-                dnsrecord_add(session, zone, record_name, "A", ip, ttl)
-            except Exception as e:
-                raise kopf.TemporaryError(f"IPA add during update failed: {e}", delay=20)
-            patch_status(namespace, meta["name"], {"phase": "Created", "message": f"A record updated to {ip}", "observedGeneration": meta.get("generation", 0)})
-            return
-    else:
-        # Create
-        try:
-            dnsrecord_add(session, zone, record_name, "A", ip, ttl)
-        except Exception as e:
-            raise kopf.TemporaryError(f"IPA add failed: {e}", delay=20)
-        patch_status(namespace, meta["name"], {"phase": "Created", "message": f"A record created {ip}", "observedGeneration": meta.get("generation", 0)})
-        return
-
-@kopf.on.delete('example.com', 'v1', 'dnsrecords')
-def on_delete(spec, meta, namespace, logger, **kwargs):
-    # Deletion handler triggered after deletionTimestamp; finalizer removal handled here
-    name = spec.get("name")
-    zone = spec.get("zone")
-    rec_type = spec.get("type", "A")
-
-    if rec_type != "A":
-        # best-effort: try to remove generic record
-        pass
-
-    record_name = normalize_name(name, zone)
-
-    try:
-        session = ensure_session()
-    except Exception as e:
-        raise kopf.TemporaryError(f"IPA auth failed: {e}", delay=30)
-
-    try:
-        dnsrecord_del(session, zone, record_name)
-    except Exception as e:
-        # If not found, consider success; otherwise requeue
-        msg = str(e)
-        if "not found" in msg.lower() or "no such" in msg.lower():
-            pass
-        else:
-            raise kopf.TemporaryError(f"IPA delete failed: {e}", delay=20)
-
-    # Remove finalizer
-    finalizers = meta.get("finalizers", []) or []
-    if FINALIZER in finalizers:
-        finalizers.remove(FINALIZER)
-        kubernetes.client.CustomObjectsApi().patch_namespaced_custom_object(
-            group="example.com", version="v1", namespace=namespace, plural="dnsrecords",
-            name=meta["name"],
-            body={"metadata": {"finalizers": finalizers}}
-        )
-
-def patch_status(namespace, name, status_dict):
-    api = kubernetes.client.CustomObjectsApi()
-    body = {"status": status_dict}
-    try:
-        api.patch_namespaced_custom_object_status(group="example.com", version="v1", namespace=namespace, plural="dnsrecords", name=name, body=body)
-    except ApiException as e:
-        logger = logging.getLogger("operator")
-        logger.error(f"Failed to patch status: {e}")
+# Note: CRD-based handlers (DNSRecord) were removed; operator now uses Service annotations only.
 
 
 # health server + kopf programmatic start
@@ -314,4 +186,116 @@ if __name__ == "__main__":
     # run kopf (will block)
     # use programmatic run so handlers defined in this module are used
     kopf.run()
+
+
+# --- Service watchers using annotations ---------------------------------
+
+
+def _get_annotation_map(meta):
+    return (meta.get("annotations") or {})
+
+
+def _process_service_dns(ns, svc_name, annotations, logger):
+    dns_name = annotations.get(ANNOTATION_DNS_NAME)
+    if not dns_name:
+        return
+    zone = annotations.get(ANNOTATION_ZONE)
+    if not zone:
+        logger.error("Service %s/%s: missing annotation %s; skipping", ns, svc_name, ANNOTATION_ZONE)
+        return
+    ttl = annotations.get(ANNOTATION_TTL)
+
+    ip = fetch_service_ip(ns, svc_name)
+    if not ip:
+        raise kopf.TemporaryError(f"Service {ns}/{svc_name} has no external IP yet", delay=15)
+
+    record_name = normalize_name(dns_name, zone)
+
+    try:
+        session = ensure_session()
+    except Exception as e:
+        raise kopf.TemporaryError(f"IPA auth failed: {e}", delay=30)
+
+    # Check existing record
+    try:
+        res = dnsrecord_show(session, zone, record_name)
+        exists = True
+    except Exception as e:
+        msg = str(e)
+        if "not found" in msg.lower() or "no such" in msg.lower():
+            exists = False
+            res = None
+        else:
+            raise kopf.TemporaryError(f"IPA show failed: {e}", delay=20)
+
+    if exists:
+        recs = []
+        try:
+            recs = res.get("result", {}).get("a_rec", []) or []
+        except Exception:
+            recs = []
+        if ip in recs:
+            logger.info("Service %s/%s: A record present %s", ns, svc_name, ip)
+            return
+        else:
+            try:
+                dnsrecord_del(session, zone, record_name)
+            except Exception as e:
+                raise kopf.TemporaryError(f"IPA delete during update failed: {e}", delay=20)
+            try:
+                dnsrecord_add(session, zone, record_name, "A", ip, ttl)
+            except Exception as e:
+                raise kopf.TemporaryError(f"IPA add during update failed: {e}", delay=20)
+            logger.info("Service %s/%s: A record updated to %s", ns, svc_name, ip)
+            return
+    else:
+        try:
+            dnsrecord_add(session, zone, record_name, "A", ip, ttl)
+        except Exception as e:
+            raise kopf.TemporaryError(f"IPA add failed: {e}", delay=20)
+        logger.info("Service %s/%s: A record created %s", ns, svc_name, ip)
+        return
+
+
+@kopf.on.create('', 'v1', 'services')
+@kopf.on.update('', 'v1', 'services')
+def service_create_update(body, meta, spec, namespace, logger, **kwargs):
+    try:
+        annotations = _get_annotation_map(meta)
+        # only handle LoadBalancer services
+        if spec.get('type') != 'LoadBalancer':
+            return
+        _process_service_dns(namespace, meta.get('name'), annotations, logger)
+    except kopf.TemporaryError:
+        raise
+    except Exception as e:
+        logger.error("Service handler error: %s", e)
+
+
+@kopf.on.delete('', 'v1', 'services')
+def service_delete(body, meta, spec, namespace, logger, **kwargs):
+    annotations = _get_annotation_map(meta)
+    dns_name = annotations.get(ANNOTATION_DNS_NAME)
+    if not dns_name:
+        return
+    zone = annotations.get(ANNOTATION_ZONE)
+    if not zone:
+        logger.error("Service %s/%s: missing annotation %s; cannot delete DNS", namespace, meta.get('name'), ANNOTATION_ZONE)
+        return
+
+    record_name = normalize_name(dns_name, zone)
+    try:
+        session = ensure_session()
+    except Exception as e:
+        raise kopf.TemporaryError(f"IPA auth failed: {e}", delay=30)
+
+    try:
+        dnsrecord_del(session, zone, record_name)
+        logger.info("Service %s/%s: DNS record %s.%s deleted", namespace, meta.get('name'), record_name, zone)
+    except Exception as e:
+        msg = str(e)
+        if "not found" in msg.lower() or "no such" in msg.lower():
+            logger.info("Service %s/%s: DNS record not found (already removed)", namespace, meta.get('name'))
+        else:
+            raise kopf.TemporaryError(f"IPA delete failed: {e}", delay=20)
 
