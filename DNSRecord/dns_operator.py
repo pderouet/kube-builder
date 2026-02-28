@@ -154,10 +154,9 @@ def dnsrecord_add(session, zone, name, rec_type, value, ttl=None):
     # dnsrecord_add expects positional args [zone, record_name] and keyword options
     kw = {}
     if rec_type == "A":
-        # send A records as list of dicts with IP field (server may expect structured entries)
-        kw["a_rec"] = [{"a_ip_address": value}]
+        kw["arecord"] = [value]
     elif rec_type == "CNAME":
-        kw["cname_rec"] = value
+        kw["cnamerecord"] = value
     if ttl is not None:
         # FreeIPA expects TTL as option 'dnsttl' (integer)
         try:
@@ -171,7 +170,7 @@ def dnsrecord_del(session, zone, name, rec_type=None, value=None):
     kw = {}
     if rec_type:
         if rec_type == "A":
-            kw["a_rec"] = [{"a_ip_address": value}] if value else []
+            kw["a_rec"] = [value] if value else []
         elif rec_type == "CNAME":
             kw["cname_rec"] = value
     return ipa_call(session, "dnsrecord_del", [[zone, name], kw])
