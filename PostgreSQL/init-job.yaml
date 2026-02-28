@@ -14,7 +14,7 @@ spec:
           imagePullPolicy: IfNotPresent
           env:
             - name: PGHOST
-              value: postgres-cnpg-access
+              value: postgres-service
             - name: PGPORT
               value: "5432"
             - name: PGUSER
