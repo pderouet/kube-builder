@@ -77,7 +77,8 @@ def ipa_login(session: requests.Session, username: str, password: str) -> bool:
     return True
 
 def ipa_call(session: requests.Session, method: str, params=None):
-    payload = {"method": method, "params": [params or [], {}]}
+    # FreeIPA JSON-RPC expects params as [<positional list>, <named dict>]
+    payload = {"method": method, "params": [[], params or {}]}
     try:
         r = session.post(IPA_JSONRPC, json=payload, timeout=REQUEST_TIMEOUT, verify=False)
         r.raise_for_status()
