@@ -122,6 +122,32 @@ def get_credentials():
     logging.getLogger("operator").debug("credentials retrieved for IPA login")
     return username, password
 
+
+def _sanitize_label_value(val: str) -> str:
+    # Kubernetes label value: <=63 chars, start/end alnum, chars alnum, '-', '_' or '.'
+    if val is None:
+        return ""
+    v = val.rstrip('.')
+    # replace invalid chars with '-'
+    import re
+    v = re.sub(r"[^A-Za-z0-9_.-]", "-", v)
+    if not v:
+        return ""
+    # ensure start/end alnum
+    if not re.match(r"^[A-Za-z0-9]", v):
+        v = "d" + v
+    if not re.match(r".*[A-Za-z0-9]$", v):
+        v = v + "d"
+    # truncate to 63
+    if len(v) > 63:
+        v = v[:63]
+        # ensure end is alnum after truncation
+        if not re.match(r".*[A-Za-z0-9]$", v):
+            v = v.rstrip('-_.')
+            if not v:
+                v = "d"
+    return v
+
 def fetch_service_ip(namespace, name):
     try:
         svc = corev1.read_namespaced_service(name, namespace)
@@ -249,6 +275,17 @@ def _process_service_dns(ns, svc_name, annotations, logger):
         # no annotation: use default name and zone
         dns_name = f"{ns}-{svc_name}.kube.{DEFAULT_ZONE}."
         zone = DEFAULT_ZONE + "."
+    # Copy the effective dns_name into a label for easier `kubectl describe` viewing.
+    try:
+        label_val = _sanitize_label_value(dns_name)
+        body = {"metadata": {"labels": {"dns-name": label_val}}}
+        try:
+            corev1.patch_namespaced_service(svc_name, ns, body)
+            logger.debug("Patched service %s/%s with label dns-name=%s", ns, svc_name, label_val)
+        except ApiException as e:
+            logger.warning("Failed to patch service %s/%s to add dns-name label: %s", ns, svc_name, e)
+    except Exception as e:
+        logger.debug("Skipping label copy due to: %s", e)
 
     ip = fetch_service_ip(ns, svc_name)
     if not ip:
