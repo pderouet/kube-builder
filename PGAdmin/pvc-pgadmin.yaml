@@ -4,6 +4,7 @@ metadata:
   name: pgadmin-pvc
   namespace: pgadmin
 spec:
+  storageClassName: standard
   accessModes:
     - ReadWriteOnce
   resources:
