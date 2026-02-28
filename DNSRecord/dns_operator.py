@@ -45,7 +45,8 @@ logger = logging.getLogger("operator")
 def ipa_login(session: requests.Session, username: str, password: str) -> bool:
     payload = {"user": username, "password": password}
     try:
-        r = session.post(LOGIN_PATH, json=payload, timeout=REQUEST_TIMEOUT, verify=False)
+        # FreeIPA expects form-encoded login on /ipa/session/login_password
+        r = session.post(LOGIN_PATH, data=payload, timeout=REQUEST_TIMEOUT, verify=False)
         r.raise_for_status()
     except requests.exceptions.RequestException as e:
         logger.error("Network error during IPA login: %s", e)
