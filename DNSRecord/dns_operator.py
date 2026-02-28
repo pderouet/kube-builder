@@ -58,12 +58,18 @@ def ipa_login(session: requests.Session, username: str, password: str) -> bool:
         logger.error("Network error during IPA login: %s", e)
         raise
 
+    # FreeIPA login typically returns a 200 with a session cookie set (ipa_session)
+    # Do not assume JSON response. Consider the login successful if the session cookie is present.
+    if 'ipa_session' in session.cookies or 'ipa_session' in r.cookies:
+        return True
+
+    # Fallback: try parsing JSON and check for errors if present
     try:
+        logger.debug(r.text)
         j = r.json()
     except ValueError:
-        logger.error(r.toString())
-        logger.error("Invalid JSON response from IPA login: %s", r.text)
-        raise RuntimeError("Invalid JSON response from IPA")
+        logger.error("Unexpected non-JSON login response and no session cookie: %s", r.text)
+        raise RuntimeError("IPA login failed: unexpected response")
 
     if j.get("error"):
         logger.error("IPA login returned error: %s", j["error"])
