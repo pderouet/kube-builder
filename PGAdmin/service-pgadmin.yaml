@@ -10,7 +10,7 @@ metadata:
     dns.example.com/zone: "axiome-it.lan."
     dns.example.com/ttl: "300"
 spec:
-  type: LoadBalancer
+  type: ClusterIP
   ports:
     - port: 80
       targetPort: 80

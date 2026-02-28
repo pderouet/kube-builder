@@ -12,3 +12,4 @@ resources:
   - pvc-pgadmin.yaml
   - deployment-pgadmin.yaml
   - service-pgadmin.yaml
+  - ingress-pgadmin.yaml
