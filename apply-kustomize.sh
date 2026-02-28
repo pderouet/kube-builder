@@ -12,15 +12,15 @@ select opt in "${options[@]}"; do
     continue;
   fi
   case "$opt" in
-    cloudDbeaver)
+    1)
       KUST_DIR="$ROOT_DIR/cloudDbeaver"
       break
       ;;
-    PostgreSQL)
+    2)
       KUST_DIR="$ROOT_DIR/PostgreSQL"
       break
       ;;
-    Quit)
+    3)
       echo "Abandon."; exit 0
       ;;
     *) echo "Choix invalide." ;;
