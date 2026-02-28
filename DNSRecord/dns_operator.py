@@ -153,6 +153,7 @@ def configure(settings: kopf.OperatorSettings, **_):
     settings.posting.level = logging.INFO
     settings.scanning.disabled = False
     settings.watching.server_timeout = 60
+    logger.info("Operator scope: namespace=%s", NAMESPACE)
 # Note: CRD-based handlers (DNSRecord) were removed; operator now uses Service annotations only.
 
 
@@ -248,8 +249,8 @@ def _process_service_dns(ns, svc_name, annotations, logger):
         return
 
 
-@kopf.on.create('', 'v1', 'services')
-@kopf.on.update('', 'v1', 'services')
+@kopf.on.create('', 'v1', 'services', namespace=NAMESPACE)
+@kopf.on.update('', 'v1', 'services', namespace=NAMESPACE)
 def service_create_update(body, meta, spec, namespace, logger, **kwargs):
     try:
         annotations = _get_annotation_map(meta)
@@ -266,7 +267,7 @@ def service_create_update(body, meta, spec, namespace, logger, **kwargs):
         logger.exception("Service handler error")
 
 
-@kopf.on.delete('', 'v1', 'services')
+@kopf.on.delete('', 'v1', 'services', namespace=NAMESPACE)
 def service_delete(body, meta, spec, namespace, logger, **kwargs):
     annotations = _get_annotation_map(meta)
     logger.info("Service delete event: %s/%s annotations=%s", namespace, meta.get('name'), annotations)
