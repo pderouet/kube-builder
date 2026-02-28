@@ -239,7 +239,7 @@ def _process_service_dns(ns, svc_name, annotations, logger):
     ttl = annotations.get(ANNOTATION_TTL)
 
     # Default behaviour: if no annotations, create a record named <namespace>-<service>.axiome-it.lan
-    DEFAULT_ZONE = os.environ.get("DEFAULT_DNS_ZONE", "kube.axiome-it.lan")
+    DEFAULT_ZONE = os.environ.get("DEFAULT_DNS_ZONE", "axiome-it.lan")
     if dns_name:
         # annotation present — require zone annotation as well
         if not zone:
@@ -247,7 +247,7 @@ def _process_service_dns(ns, svc_name, annotations, logger):
             return
     else:
         # no annotation: use default name and zone
-        dns_name = f"{ns}-{svc_name}.{DEFAULT_ZONE}."
+        dns_name = f"{ns}-{svc_name}.{DEFAULT_ZONE}.kube."
         zone = DEFAULT_ZONE + "."
 
     ip = fetch_service_ip(ns, svc_name)
@@ -330,7 +330,7 @@ def service_delete(body, meta, spec, namespace, logger, **kwargs):
     DEFAULT_ZONE = os.environ.get("DEFAULT_DNS_ZONE", "axiome-it.lan")
     if not dns_name:
         # Use default naming when no annotation provided
-        dns_name = f"{namespace}-{meta.get('name')}.{DEFAULT_ZONE}."
+        dns_name = f"{namespace}-{meta.get('name')}.{DEFAULT_ZONE}.kube."
         zone = DEFAULT_ZONE + "."
         logger.info("Service %s/%s: no dns annotations, using default dns_name=%s", namespace, meta.get('name'), dns_name)
     else:
