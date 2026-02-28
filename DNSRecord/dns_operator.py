@@ -225,13 +225,20 @@ def _get_annotation_map(meta):
 
 def _process_service_dns(ns, svc_name, annotations, logger):
     dns_name = annotations.get(ANNOTATION_DNS_NAME)
-    if not dns_name:
-        return
     zone = annotations.get(ANNOTATION_ZONE)
-    if not zone:
-        logger.error("Service %s/%s: missing annotation %s; skipping", ns, svc_name, ANNOTATION_ZONE)
-        return
     ttl = annotations.get(ANNOTATION_TTL)
+
+    # Default behaviour: if no annotations, create a record named <namespace>-<service>.axiome-it.lan
+    DEFAULT_ZONE = os.environ.get("DEFAULT_DNS_ZONE", "axiome-it.lan")
+    if dns_name:
+        # annotation present — require zone annotation as well
+        if not zone:
+            logger.error("Service %s/%s: missing annotation %s; skipping", ns, svc_name, ANNOTATION_ZONE)
+            return
+    else:
+        # no annotation: use default name and zone
+        dns_name = f"{ns}-{svc_name}.{DEFAULT_ZONE}."
+        zone = DEFAULT_ZONE + "."
 
     ip = fetch_service_ip(ns, svc_name)
     if not ip:
