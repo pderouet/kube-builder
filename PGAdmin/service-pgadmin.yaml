@@ -5,8 +5,12 @@ metadata:
   namespace: pgadmin
   labels:
     app: pgadmin
+  annotations:
+    dns.example.com/dns-name: "k8s.pgadmin.axiome-it.lan."
+    dns.example.com/zone: "axiome-it.lan."
+    dns.example.com/ttl: "300"
 spec:
-  type: ClusterIP
+  type: LoadBalancer
   ports:
     - port: 80
       targetPort: 80
@@ -14,4 +18,6 @@ spec:
       name: http
   selector:
     app: pgadmin
+
+    
 
