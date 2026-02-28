@@ -20,12 +20,12 @@ spec:
             - name: PGUSER
               valueFrom:
                 secretKeyRef:
-                  name: postgres-cnpg-superuser  # <-- replace with actual CNPG secret name
+                  name: superuser  # <-- replace with actual CNPG secret name
                   key: username
             - name: PGPASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: postgres-cnpg-superuser  # <-- replace with actual CNPG secret name
+                  name: superuser  # <-- replace with actual CNPG secret name
                   key: password
           volumeMounts:
             - name: init-sql

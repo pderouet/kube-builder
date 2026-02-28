@@ -6,7 +6,7 @@ metadata:
 data:
   init.sql: |
     -- This SQL creates a schema in the target database.
-    -- The Job below will run this file against `mydatabase`.
-    CREATE SCHEMA IF NOT EXISTS myschema AUTHORIZATION appuser;
+    -- The Job below will run this file against `DBATools`.
+    CREATE SCHEMA IF NOT EXISTS default AUTHORIZATION appuser;
 
 # Edit namespace, database name and schema as needed.
