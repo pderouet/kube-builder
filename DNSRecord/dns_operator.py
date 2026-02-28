@@ -61,7 +61,7 @@ def ipa_login(session: requests.Session, username: str, password: str) -> bool:
     try:
         j = r.json()
     except ValueError:
-        logger.error(r)
+        logger.error(r.toString())
         logger.error("Invalid JSON response from IPA login: %s", r.text)
         raise RuntimeError("Invalid JSON response from IPA")
 
