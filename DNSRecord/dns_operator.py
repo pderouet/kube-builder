@@ -77,8 +77,19 @@ def ipa_login(session: requests.Session, username: str, password: str) -> bool:
     return True
 
 def ipa_call(session: requests.Session, method: str, params=None):
-    # FreeIPA JSON-RPC expects params as [<positional list>, <named dict>]
-    payload = {"method": method, "params": [[], params or {}]}
+    # Build JSON-RPC payload. Accept three forms for `params`:
+    # - a 2-item (positional_list, kwargs_dict) sequence -> used as-is
+    # - a list -> treated as positional args list
+    # - a dict -> treated as kwargs
+    if isinstance(params, (list, tuple)) and len(params) == 2 and isinstance(params[0], list) and isinstance(params[1], dict):
+        payload = {"method": method, "params": [params[0], params[1]]}
+    elif isinstance(params, list):
+        payload = {"method": method, "params": [params, {}]}
+    elif isinstance(params, dict):
+        payload = {"method": method, "params": [[], params or {}]}
+    else:
+        payload = {"method": method, "params": [[], {}]}
+
     try:
         r = session.post(IPA_JSONRPC, json=payload, timeout=REQUEST_TIMEOUT, verify=False)
         r.raise_for_status()
@@ -136,24 +147,29 @@ def normalize_name(spec_name, zone):
     return name
 
 def dnsrecord_show(session, zone, name):
-    # method: dnsrecord_show
-    params = {"id": zone, "record_name": name}
-    return ipa_call(session, "dnsrecord_show", params)
+    # method: dnsrecord_show expects positional args: [zone, record_name]
+    return ipa_call(session, "dnsrecord_show", [[zone, name], {}])
 
 def dnsrecord_add(session, zone, name, rec_type, value, ttl=None):
-    params = {"id": zone, "record_name": name}
+    # dnsrecord_add expects positional args [zone, record_name] and keyword options
+    kw = {}
     if rec_type == "A":
-        params["a_rec"] = [value]
+        kw["a_rec"] = [value]
     elif rec_type == "CNAME":
-        params["cname_rec"] = value
+        kw["cname_rec"] = value
     if ttl:
-        params["ttl"] = str(ttl)
-    return ipa_call(session, "dnsrecord_add", params)
+        kw["ttl"] = str(ttl)
+    return ipa_call(session, "dnsrecord_add", [[zone, name], kw])
 
 def dnsrecord_del(session, zone, name, rec_type=None, value=None):
-    params = {"id": zone, "record_name": name}
-    # ipa dnsrecord_del typically deletes the whole record; server-side may require specifics
-    return ipa_call(session, "dnsrecord_del", params)
+    # dnsrecord_del: positional [zone, record_name], optional kwargs
+    kw = {}
+    if rec_type:
+        if rec_type == "A":
+            kw["a_rec"] = [value] if value else []
+        elif rec_type == "CNAME":
+            kw["cname_rec"] = value
+    return ipa_call(session, "dnsrecord_del", [[zone, name], kw])
 
 def ensure_session():
     s = requests.Session()
