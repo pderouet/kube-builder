@@ -4,7 +4,8 @@ metadata:
   name: mydatabase
   namespace: default
 spec:
-  cluster: postgres-cnpg
+  cluster:
+    name: postgres-cnpg
   name: mydatabase
   owner: appuser
 
