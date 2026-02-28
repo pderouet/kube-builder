@@ -7,8 +7,3 @@ resources:
   - service.yaml
   - deployment.yaml
   - service-annotated.yaml
-  - secret.yaml
-  - rbac-restricted.yaml
-  - service.yaml
-  - deployment.yaml
-  - service-annotated.yaml
