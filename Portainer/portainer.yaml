@@ -28,7 +28,7 @@ metadata:
   name: portainer-agent
   namespace: portainer
 spec:
-  type: NodePort
+  type: LoadBalancer
   selector:
     app: portainer-agent
   ports:
@@ -36,7 +36,6 @@ spec:
       protocol: TCP
       port: 9001
       targetPort: 9001
-      nodePort: 31000    
 ---
 apiVersion: v1
 kind: Service
