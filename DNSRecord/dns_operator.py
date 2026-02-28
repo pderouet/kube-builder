@@ -262,19 +262,23 @@ def _process_service_dns(ns, svc_name, annotations, logger):
 def service_create_update(body, meta, spec, namespace, logger, **kwargs):
     try:
         annotations = _get_annotation_map(meta)
+        # debug log incoming event
+        logger.info("Service event received: %s/%s type=%s annotations=%s", namespace, meta.get('name'), spec.get('type'), annotations)
         # only handle LoadBalancer services
         if spec.get('type') != 'LoadBalancer':
+            logger.info("Service %s/%s: ignored (type != LoadBalancer)", namespace, meta.get('name'))
             return
         _process_service_dns(namespace, meta.get('name'), annotations, logger)
     except kopf.TemporaryError:
         raise
     except Exception as e:
-        logger.error("Service handler error: %s", e)
+        logger.exception("Service handler error")
 
 
 @kopf.on.delete('', 'v1', 'services')
 def service_delete(body, meta, spec, namespace, logger, **kwargs):
     annotations = _get_annotation_map(meta)
+    logger.info("Service delete event: %s/%s annotations=%s", namespace, meta.get('name'), annotations)
     dns_name = annotations.get(ANNOTATION_DNS_NAME)
     if not dns_name:
         return
