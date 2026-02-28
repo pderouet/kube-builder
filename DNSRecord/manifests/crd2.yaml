@@ -1,0 +1,52 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: dnsrecords.example.com
+spec:
+  group: example.com
+  scope: Namespaced
+  names:
+    plural: dnsrecords
+    singular: dnsrecord
+    kind: DNSRecord
+    shortNames:
+      - dr
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required: ["name","zone","type"]
+              properties:
+                name:
+                  type: string
+                zone:
+                  type: string
+                type:
+                  type: string
+                  enum: ["A","AAAA","CNAME"]
+                value:
+                  type: string
+                ttl:
+                  type: integer
+                serviceName:
+                  type: string
+                serviceNamespace:
+                  type: string
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                message:
+                  type: string
+                observedGeneration:
+                  type: integer
+      subresources:
+        status: {}
+

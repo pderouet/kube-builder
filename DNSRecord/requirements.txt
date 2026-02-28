@@ -1,0 +1,4 @@
+kopf==1.38.0
+kubernetes>=23.0.0,<25.0.0
+requests==2.31.0
+

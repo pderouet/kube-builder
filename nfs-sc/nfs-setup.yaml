@@ -1,0 +1,98 @@
+# Namespace + ServiceAccount
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nfs-provisioner
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: nfs-provisioner-sa
+  namespace: nfs-provisioner
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: nfs-provisioner-runner
+rules:
+  - apiGroups: [""]
+    resources: ["endpoints"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch", "create", "delete", "patch", "update"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "update", "create", "patch"]
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch", "update"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: nfs-provisioner-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: nfs-provisioner-runner
+subjects:
+  - kind: ServiceAccount
+    name: nfs-provisioner-sa
+    namespace: nfs-provisioner
+---
+# Deployment du provisioner (image modifiée)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nfs-subdir-external-provisioner
+  namespace: nfs-provisioner
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nfs-subdir-external-provisioner
+  template:
+    metadata:
+      labels:
+        app: nfs-subdir-external-provisioner
+    spec:
+      serviceAccountName: nfs-provisioner-sa
+      containers:
+        - name: nfs-subdir-external-provisioner
+          image: k8s.gcr.io/sig-storage/nfs-subdir-external-provisioner:v4.0.2
+          env:
+            - name: PROVISIONER_NAME
+              value: example.com/nfs
+            - name: NFS_SERVER
+              value: "10.0.33.1"        # <- changez l'IP/hostname
+            - name: NFS_PATH
+              value: "/nfsshare"  # <- changez le chemin exporté
+          volumeMounts:
+            - name: nfs-root
+              mountPath: /persistentvolumes
+      volumes:
+        - name: nfs-root
+          nfs:
+            server: 10.0.33.1          # <- même que NFS_SERVER
+            path: /nfsshare       # <- même que NFS_PATH
+---
+# StorageClass par défaut pointant vers le provisioner
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nfs-default
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: example.com/nfs
+parameters:
+  archiveOnDelete: "false"
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+
