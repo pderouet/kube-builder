@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # operator.py
 import os
 import time
@@ -46,7 +47,12 @@ def ipa_login(session: requests.Session, username: str, password: str) -> bool:
     payload = {"user": username, "password": password}
     try:
         # FreeIPA expects form-encoded login on /ipa/session/login_password
-        r = session.post(LOGIN_PATH, data=payload, timeout=REQUEST_TIMEOUT, verify=False)
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Accept": "text/plain",
+            "Referer": f"{IPA_SERVER}/ipa",
+        }
+        r = session.post(LOGIN_PATH, data=payload, headers=headers, timeout=REQUEST_TIMEOUT, verify=False)
         r.raise_for_status()
     except requests.exceptions.RequestException as e:
         logger.error("Network error during IPA login: %s", e)
@@ -93,8 +99,8 @@ def get_credentials():
         raise RuntimeError("Secret must contain 'username' and 'password' keys (base64 encoded).")
     username = base64.b64decode(data["username"]).decode()
     password = base64.b64decode(data["password"]).decode()
-    logger = logging.getLogger("operator")
-    logger.error(username + " " + password)
+    # avoid logging credentials to prevent secret leakage
+    logging.getLogger("operator").debug("credentials retrieved for IPA login")
     return username, password
 
 def fetch_service_ip(namespace, name):
@@ -143,7 +149,8 @@ def dnsrecord_del(session, zone, name, rec_type=None, value=None):
 
 def ensure_session():
     s = requests.Session()
-    s.headers.update({"Referer": IPA_SERVER})
+    # FreeIPA expects Referer including /ipa and prefers plain text responses
+    s.headers.update({"Referer": f"{IPA_SERVER}/ipa", "Accept": "text/plain"})
     username, password = get_credentials()
     ipa_login(s, username, password)
     return s
