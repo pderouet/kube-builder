@@ -7,9 +7,9 @@ echo "Choisissez le kustomization à appliquer :"
 options=("cloudDbeaver" "PostgreSQL" "Quit")
 PS3="Votre choix : "
 select opt in "${options[@]}"; do
-  if [ -z "$opt" ]; then
+  if [ -z "${opt:-}" ]; then
     echo "Choix invalide.";
-    continue;
+    continue
   fi
   case "$opt" in
     cloudDbeaver)
@@ -26,34 +26,18 @@ select opt in "${options[@]}"; do
     *) echo "Choix invalide." ;;
   esac
 done
-else
-  # Fallback: edit kustomization.yaml namespace line or add it
-  if [ -f "$TMPDIR/kustomization.yaml" ]; then
-    if grep -q -E "^\s*namespace\s*:\s*" "$TMPDIR/kustomization.yaml"; then
-      sed -i -E "s/^(\s*namespace\s*:\s*).*/\1$TARGET_NS/" "$TMPDIR/kustomization.yaml"
-    else
-      # insert namespace as second line to be safe
-      awk -v ns="$TARGET_NS" 'NR==1{print; print "namespace: " ns; next} {print}' "$TMPDIR/kustomization.yaml" > "$TMPDIR/kustomization.yaml.tmp" && mv "$TMPDIR/kustomization.yaml.tmp" "$TMPDIR/kustomization.yaml"
-    fi
-  else
-    # if there's no kustomization.yaml, create a minimal one that sets namespace and will let kubectl apply the files
-    cat > "$TMPDIR/kustomization.yaml" <<EOF
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-namespace: $TARGET_NS
-resources:
-  # resources are the files in this directory
-EOF
-    # append all yaml files found in the dir to the resources list (skip kustomization itself)
-    for f in "$TMPDIR"/*.yaml; do
-      [ "$(basename "$f")" = "kustomization.yaml" ] && continue
-      echo "  - $(basename "$f")" >> "$TMPDIR/kustomization.yaml"
-    done
-  fi
+
+if [ -z "${KUST_DIR:-}" ] || [ ! -d "$KUST_DIR" ]; then
+  echo "Dossier kustomization introuvable : ${KUST_DIR:-<none>}" >&2
+  exit 2
+fi
+
+# Detect default namespace from kustomization if present
+KUST_FILE="$KUST_DIR/kustomization.yaml"
 DEFAULT_NS="default"
 if [ -f "$KUST_FILE" ]; then
   ns_line=$(grep -E "^\s*namespace\s*:\s*" "$KUST_FILE" || true)
-kubectl apply -k "$TMPDIR"
+  if [ -n "$ns_line" ]; then
     DEFAULT_NS=$(echo "$ns_line" | awk -F: '{print $2}' | xargs)
   fi
 fi
@@ -81,4 +65,24 @@ else
       sed -i -E "s/^(\s*namespace\s*:\s*).*/\1$TARGET_NS/" "$TMPDIR/kustomization.yaml"
     else
       # insert namespace as second line to be safe
-      awk 'NR==1{print;print "namespace: '
+      awk -v ns="$TARGET_NS" 'NR==1{print; print "namespace: " ns; next} {print}' "$TMPDIR/kustomization.yaml" > "$TMPDIR/kustomization.yaml.tmp" && mv "$TMPDIR/kustomization.yaml.tmp" "$TMPDIR/kustomization.yaml"
+    fi
+  else
+    # if there's no kustomization.yaml, create a minimal one that sets namespace and lists resources
+    cat > "$TMPDIR/kustomization.yaml" <<EOF
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: $TARGET_NS
+resources:
+EOF
+    for f in "$TMPDIR"/*.yaml; do
+      [ "$(basename "$f")" = "kustomization.yaml" ] && continue
+      echo "  - $(basename "$f")" >> "$TMPDIR/kustomization.yaml"
+    done
+  fi
+fi
+
+echo "Applying kustomize from $TMPDIR (namespace=$TARGET_NS) ..."
+kubectl apply -k "$TMPDIR"
+
+echo "Done."
