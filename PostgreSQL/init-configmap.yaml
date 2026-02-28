@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cnpg-init-sql
+  namespace: default
+data:
+  init.sql: |
+    -- This SQL creates a schema in the target database.
+    -- The Job below will run this file against `mydatabase`.
+    CREATE SCHEMA IF NOT EXISTS myschema AUTHORIZATION appuser;
+
+# Edit namespace, database name and schema as needed.

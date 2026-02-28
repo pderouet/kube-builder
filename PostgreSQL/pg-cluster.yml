@@ -1,7 +1,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: postgres-cnpg
+  name: postgres
 spec:
   instances: 3
   managed:
@@ -11,12 +11,11 @@ spec:
         - selectorType: rw
           serviceTemplate:
             metadata:
-              name: postgres-cnpg-access
+              name: postgres-service
             spec:
-              type: NodePort
+              type: LoadBalancer
               ports:
                 - port: 5432
                   targetPort: 5432
-                  nodePort: 31001
   storage:
     size: 1Gi

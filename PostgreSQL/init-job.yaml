@@ -1,0 +1,45 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cnpg-init-job
+  namespace: default
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: init
+          image: postgres:15
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PGHOST
+              value: postgres-cnpg-access
+            - name: PGPORT
+              value: "5432"
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-cnpg-superuser  # <-- replace with actual CNPG secret name
+                  key: username
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-cnpg-superuser  # <-- replace with actual CNPG secret name
+                  key: password
+          volumeMounts:
+            - name: init-sql
+              mountPath: /init
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -euo pipefail
+              until pg_isready -h "$PGHOST" -p "$PGPORT" -U "$PGUSER"; do
+                echo "waiting for postgres..."; sleep 2
+              done
+              psql -v ON_ERROR_STOP=1 -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d mydatabase -f /init/init.sql
+      volumes:
+        - name: init-sql
+          configMap:
+            name: cnpg-init-sql

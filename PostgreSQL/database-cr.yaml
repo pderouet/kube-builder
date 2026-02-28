@@ -1,0 +1,12 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: mydatabase
+  namespace: default
+spec:
+  cluster: postgres-cnpg
+  name: mydatabase
+  owner: appuser
+
+# This CR will request the operator to create the database `mydatabase`
+# owned by `appuser`. Ensure the cluster name and namespace match your setup.
